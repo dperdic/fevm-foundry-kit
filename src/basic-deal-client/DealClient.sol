@@ -57,7 +57,7 @@ struct ExtraParamsV1 {
   bool remove_unsealed_copy;
 }
 
-function serializeExtraParamsV1(
+function _serializeExtraParamsV1(
   ExtraParamsV1 memory params
 ) pure returns (bytes memory) {
   CBOR.CBORBuffer memory buf = CBOR.create(64);
@@ -168,7 +168,7 @@ contract DealClient {
   }
 
   // helper function to get deal request based from id
-  function getDealRequest(
+  function _getDealRequest(
     bytes32 requestId
   ) internal view returns (DealRequest memory) {
     RequestIdx memory ri = dealRequestIdx[requestId];
@@ -180,7 +180,7 @@ contract DealClient {
   function getDealProposal(
     bytes32 proposalId
   ) public view returns (bytes memory) {
-    DealRequest memory deal = getDealRequest(proposalId);
+    DealRequest memory deal = _getDealRequest(proposalId);
 
     MarketTypes.DealProposal memory ret;
     ret.piece_cid = CommonTypes.Cid(deal.piece_cid);
@@ -204,8 +204,8 @@ contract DealClient {
   function getExtraParams(
     bytes32 proposalId
   ) public view returns (bytes memory extra_params) {
-    DealRequest memory deal = getDealRequest(proposalId);
-    return serializeExtraParamsV1(deal.extra_params);
+    DealRequest memory deal = _getDealRequest(proposalId);
+    return _serializeExtraParamsV1(deal.extra_params);
   }
 
 
@@ -214,7 +214,7 @@ contract DealClient {
   // miner, which needs to be validated by the contract in accordance with the
   // deal requests made and the contract's own policies
   // @params - cbor byte array of AccountTypes.AuthenticateMessageParams
-  function authenticateMessage(bytes memory params) internal view {
+  function _authenticateMessage(bytes memory params) internal view {
     require(
       msg.sender == MARKET_ACTOR_ETH_ADDRESS,
       "msg.sender needs to be market actor f05"
@@ -230,7 +230,7 @@ contract DealClient {
     require(pieceRequests[pieceCid].valid, "piece cid must be added before authorizing");
     require(!pieceProviders[pieceCid].valid, "deal failed policy check: provider already claimed this cid");
 
-    DealRequest memory req = getDealRequest(pieceRequests[pieceCid].requestId);
+    DealRequest memory req = _getDealRequest(pieceRequests[pieceCid].requestId);
     require(proposal.verified_deal == req.verified_deal, "verified_deal param mismatch");
     (uint256 proposalStoragePricePerEpoch, bool storagePriceConverted) = BigInts.toUint256(proposal.storage_price_per_epoch);
     (uint256 proposalClientCollateral, bool collateralConverted) = BigInts.toUint256(proposal.storage_price_per_epoch);
@@ -245,7 +245,7 @@ contract DealClient {
   // and the associated dealID. The dealID is stored as part of the contract state
   // and the completion of this call marks the success of PublishStorageDeals
   // @params - cbor byte array of MarketDealNotifyParams
-  function dealNotify(bytes memory params) internal {
+  function _dealNotify(bytes memory params) internal {
     require(
       msg.sender == MARKET_ACTOR_ETH_ADDRESS,
       "msg.sender needs to be market actor f05"
@@ -326,7 +326,7 @@ contract DealClient {
     return withdrawBalanceAmount;
   }
 
-  function receiveDataCap(bytes memory params) internal {
+  function _receiveDataCap(bytes memory params) internal {
     require(
       msg.sender == DATACAP_ACTOR_ETH_ADDRESS,
       "msg.sender needs to be datacap actor f07"
@@ -349,16 +349,16 @@ contract DealClient {
     uint64 codec;
     // dispatch methods
     if (method == AUTHENTICATE_MESSAGE_METHOD_NUM) {
-      authenticateMessage(params);
+      _authenticateMessage(params);
       // If we haven't reverted, we should return a CBOR true to indicate that verification passed.
       CBOR.CBORBuffer memory buf = CBOR.create(1);
       buf.writeBool(true);
       ret = buf.data();
       codec = Misc.CBOR_CODEC;
     } else if (method == MARKET_NOTIFY_DEAL_METHOD_NUM) {
-      dealNotify(params);
+      _dealNotify(params);
     } else if (method == DATACAP_RECEIVER_HOOK_METHOD_NUM) {
-      receiveDataCap(params);
+      _receiveDataCap(params);
     } else {
       revert("the filecoin method that was called is not handled");
     }
